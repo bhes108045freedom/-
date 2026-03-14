@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>寶可夢輪播圖鑑</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* 搜尋框設計 */
+        .search-container {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+        }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            width: 250px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #ffcb05; /* 寶可夢經典黃 */
+            color: #3b4cca; /* 寶可夢經典藍 */
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #e5b700;
+        }
+
+        /* 輪播容器設定 */
+        .swiper {
+            width: 100%;
+            max-width: 800px;
+            height: 400px;
+            padding-top: 20px;
+            padding-bottom: 50px;
+        }
+
+        /* 單張卡片設計 */
+        .swiper-slide {
+            background-position: center;
+            background-size: cover;
+            width: 200px;
+            height: 300px;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease; /* 滑動時的縮放動畫 */
+        }
+
+        /* 讓中間那張卡片放大 (Carousel 特效) */
+        .swiper-slide-active {
+            transform: scale(1.2);
+            z-index: 10;
+            border: 3px solid #ffcb05;
+        }
+
+        .pokemon-img {
+            width: 150px;
+            height: 150px;
+        }
+        .pokemon-id {
+            color: #888;
+            font-size: 14px;
+        }
+        .pokemon-name {
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: capitalize; /* 首字母大寫 */
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎮 寶可夢輪播圖鑑</h1>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="輸入英文名稱或編號 (如 pikachu 或 25)">
+        <button onclick="searchPokemon()">搜尋</button>
+    </div>
+
+    <div class="swiper">
+        <div class="swiper-wrapper" id="pokemonContainer">
+            </div>
+        <div class="swiper-button-next"></div>
+        <div class="swiper-button-prev"></div>
+        <div class="swiper-pagination"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+    <script>
+        // 1. 初始化 Swiper 輪播套件
+        const swiper = new Swiper('.swiper', {
+            effect: 'coverflow', // 使用 3D 翻轉效果
+            grabCursor: true,
+            centeredSlides: true, // 讓當前卡片置中
+            slidesPerView: 'auto', // 自動計算顯示幾張
+            coverflowEffect: {
+                rotate: 0,
+                stretch: 0,
+                depth: 100,
+                modifier: 2,
+                slideShadows: false,
+            },
+            navigation: {
+                nextEl: '.swiper-button-next',
+                prevEl: '.swiper-button-prev',
+            },
+            pagination: {
+                el: '.swiper-pagination',
+            },
+        });
+
+        const container = document.getElementById('pokemonContainer');
+
+        // 2. 產生單張寶可夢卡片的 HTML 結構
+        function createPokemonCard(data) {
+            const slide = document.createElement('div');
+            slide.className = 'swiper-slide';
+            
+            // 讀取圖片、編號與名稱
+            const imageUrl = data.sprites.other['official-artwork'].front_default || data.sprites.front_default;
+            
+            slide.innerHTML = `
+                <img src="${imageUrl}" alt="${data.name}" class="pokemon-img">
+                <div class="pokemon-id">#${data.id.toString().padStart(3, '0')}</div>
+                <div class="pokemon-name">${data.name}</div>
+            `;
+            return slide;
+        }
+
+        // 3. 畫面載入時，先抓取前 15 隻寶可夢
+        async function loadInitialPokemon() {
+            container.innerHTML = ''; // 清空容器
+            for (let i = 1; i <= 15; i++) {
+                try {
+                    const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${i}`);
+                    const data = await response.json();
+                    container.appendChild(createPokemonCard(data));
+                } catch (error) {
+                    console.error("讀取失敗:", error);
+                }
+            }
+            swiper.update(); // 告訴 Swiper 卡片已經更新，請重新計算排版
+            swiper.slideTo(0); // 回到第一張
+        }
+
+        // 4. 搜尋特定寶可夢功能
+        async function searchPokemon() {
+            // 取得輸入值，轉小寫並去除空白 (PokeAPI 規定全小寫)
+            const query = document.getElementById('searchInput').value.trim().toLowerCase();
+            
+            if (!query) {
+                alert("請輸入寶可夢名稱或編號！");
+                return;
+            }
+
+            try {
+                // 向 API 發送搜尋請求
+                const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${query}`);
+                
+                if (!response.ok) throw new Error('找不到寶可夢');
+                
+                const data = await response.json();
+                
+                // 搜尋成功：清空輪播，只顯示搜尋到的那一隻
+                container.innerHTML = ''; 
+                container.appendChild(createPokemonCard(data));
+                
+                swiper.update();
+                swiper.slideTo(0);
+                
+            } catch (error) {
+                alert("找不到這隻寶可夢 😢 請確認拼字或編號是否正確 (例如: pikachu 或 25)");
+            }
+        }
+
+        // 程式起點：執行初始載入
+        loadInitialPokemon();
+
+    </script>
+</body>
+</html>
